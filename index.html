@@ -1,0 +1,1201 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>イオン置換ラボ</title>
+<meta name="description" content="神経細胞の Na⁺・K⁺・Ca²⁺ を別の金属イオンに置き換えたときの平衡電位・静止膜電位・相対透過性を試算するシミュレーター">
+<meta name="theme-color" content="#f3f5f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14171d" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="イオン置換ラボ">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root {
+  --bg: #f3f5f9; --card: #ffffff; --ink: #1b2230; --muted: #5e6779; --line: #dde2ea; --soft: #eef1f6;
+  --accent: #2f5fa7; --accent-ink: #ffffff; --accent-soft: #e4ecf8;
+  --ok: #2e7d4f; --ok-soft: #e3f3e8; --bad: #b3261e; --bad-soft: #fbe6e4; --warn: #9a5212; --warn-soft: #fbefe2;
+  --na: #e8590c; --k: #1c7ed6; --ca: #2f9e44; --cl: #7950f2; --a: #868e96;
+  --hm-mid: #f4f4f2; --hm-na: #e9ecef;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171d; --card: #1d2129; --ink: #e6e9ef; --muted: #9aa3b2; --line: #313744; --soft: #262b35;
+    --accent: #6f9be0; --accent-ink: #0f1420; --accent-soft: #24324a;
+    --ok: #63c08a; --ok-soft: #1f3529; --bad: #f08a80; --bad-soft: #3d2322; --warn: #e3a35f; --warn-soft: #3a2c1c;
+    --na: #ff8a4c; --k: #5aa9f0; --ca: #5cc475; --cl: #a48cff; --a: #9aa3b2;
+    --hm-mid: #e9e9e6; --hm-na: #3a404c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14171d; --card: #1d2129; --ink: #e6e9ef; --muted: #9aa3b2; --line: #313744; --soft: #262b35;
+  --accent: #6f9be0; --accent-ink: #0f1420; --accent-soft: #24324a;
+  --ok: #63c08a; --ok-soft: #1f3529; --bad: #f08a80; --bad-soft: #3d2322; --warn: #e3a35f; --warn-soft: #3a2c1c;
+  --na: #ff8a4c; --k: #5aa9f0; --ca: #5cc475; --cl: #a48cff; --a: #9aa3b2;
+  --hm-mid: #e9e9e6; --hm-na: #3a404c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", "Meiryo", sans-serif;
+  font-size: 15px; line-height: 1.6;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+header {
+  padding: calc(14px + env(safe-area-inset-top)) 16px 6px; max-width: 1080px; margin: 0 auto;
+}
+header h1 { margin: 0; font-size: 21px; letter-spacing: .02em; }
+header p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+nav.tabs {
+  position: sticky; top: 0; z-index: 5; background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+nav.tabs .inner {
+  max-width: 1080px; margin: 0 auto; display: flex; gap: 2px; overflow-x: auto; padding: 0 10px;
+  scrollbar-width: none;
+}
+nav.tabs .inner::-webkit-scrollbar { display: none; }
+nav.tabs button {
+  flex: 0 0 auto; border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px;
+  padding: 10px 12px; border-bottom: 2.5px solid transparent; cursor: pointer;
+}
+nav.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+main { max-width: 1080px; margin: 0 auto; padding: 12px 16px 40px; }
+.tab { display: none; }
+.tab.active { display: block; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px; margin: 0 0 12px;
+}
+.card h2 { font-size: 15.5px; margin: 0 0 10px; }
+.card h3 { font-size: 14px; margin: 14px 0 6px; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.grid2 > * { min-width: 0; }
+@media (min-width: 860px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+.hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+.roles { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 720px) { .roles { grid-template-columns: repeat(3, 1fr); } }
+.role {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px;
+  background: var(--soft); border-left: 4px solid var(--a);
+}
+.role.Na { border-left-color: var(--na); } .role.K { border-left-color: var(--k); } .role.Ca { border-left-color: var(--ca); }
+.role .rn { font-weight: 700; }
+.role .rd { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+select, input[type=number], input[type=text], textarea {
+  font: inherit; font-size: 15px; color: var(--ink); background: var(--card);
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; width: 100%;
+}
+textarea { font-family: ui-monospace, "Consolas", monospace; font-size: 12.5px; min-height: 180px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+.row .lbl { color: var(--muted); font-size: 13px; min-width: 7em; }
+.seg { display: inline-flex; background: var(--soft); border-radius: 9px; padding: 3px; flex-wrap: wrap; }
+.seg button {
+  border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--ink);
+  padding: 5px 11px; border-radius: 7px; cursor: pointer;
+}
+.seg button.on { background: var(--card); color: var(--accent); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+.chk input { width: 17px; height: 17px; accent-color: var(--accent); }
+button.btn, a.btn {
+  font: inherit; font-size: 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+  padding: 7px 13px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block;
+}
+button.ghost { background: transparent; color: var(--accent); }
+.headline { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.kicker { color: var(--muted); font-size: 13px; }
+.big { font-size: 38px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.big span { font-size: 17px; font-weight: 500; color: var(--muted); }
+.sub { color: var(--muted); font-size: 13.5px; }
+.status { padding: 5px 12px; border-radius: 999px; font-weight: 700; font-size: 14px; white-space: nowrap; }
+.status.ok { background: var(--ok-soft); color: var(--ok); }
+.status.bad { background: var(--bad-soft); color: var(--bad); }
+.combo { font-size: 17px; font-weight: 600; margin: 8px 0 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip { font-size: 12.5px; padding: 2px 9px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: right; white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12.5px; background: var(--soft); position: sticky; top: 0; }
+td.l, th.l { text-align: left; }
+tr.sel td { background: var(--accent-soft); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.figure svg { width: 100%; height: auto; display: block; }
+svg text { font-family: inherit; fill: var(--ink); }
+svg .mut { fill: var(--muted); }
+.hm-wrap { overflow: auto; max-height: 80vh; border: 1px solid var(--line); border-radius: 8px; }
+.hm-wrap svg { display: block; }
+.hm-wrap rect.cell { cursor: pointer; }
+.legend { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin: 8px 0 0; flex-wrap: wrap; }
+.legend .bar { width: 180px; height: 10px; border-radius: 5px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 14px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+.form { display: grid; grid-template-columns: 1fr; gap: 8px 14px; }
+@media (min-width: 640px) { .form { grid-template-columns: repeat(2, 1fr); } }
+.form label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
+.form label input, .form label select { color: var(--ink); }
+.prose p, .prose li { font-size: 14.5px; }
+.prose ul { padding-left: 20px; }
+.prose code { background: var(--soft); padding: 0 4px; border-radius: 4px; font-size: 13px; }
+.eq { font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif; background: var(--soft); border-left: 3px solid var(--accent); padding: 6px 10px; border-radius: 4px; margin: 6px 0; overflow-x: auto; }
+.msg { font-size: 13px; margin-top: 6px; }
+.msg.err { color: var(--bad); } .msg.ok { color: var(--ok); }
+footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16px 30px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>イオン置換ラボ</h1>
+  <p>神経細胞の Na⁺・K⁺・Ca²⁺ を別の金属イオンに置き換えたときの平衡電位・静止膜電位・透過性を試算します</p>
+</header>
+<nav class="tabs"><div class="inner" id="tabbar">
+  <button data-tab="case" class="active">1ケース</button>
+  <button data-tab="grid">組み合わせ</button>
+  <button data-tab="perm">透過性 P</button>
+  <button data-tab="ions">イオン表</button>
+  <button data-tab="settings">設定</button>
+  <button data-tab="help">説明</button>
+</div></nav>
+
+<main>
+<!-- ===================== 1ケース ===================== -->
+<section class="tab active" id="tab-case">
+  <div class="card">
+    <h2>持ち場に入れるイオン</h2>
+    <div class="roles" id="role-pickers"></div>
+    <div class="row"><span class="lbl">濃度の決め方</span><div class="seg" id="seg-rule"></div></div>
+    <div class="row"><span class="lbl">透過性 P</span><div class="seg" id="seg-pmodel"></div></div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="chk-activity"> 活量で計算（Davies 式）</label>
+      <label class="chk"><input type="checkbox" id="chk-block"> 詰まり（ブロック）を入れる</label>
+      <button class="btn ghost" id="btn-native">生体に戻す</button>
+    </div>
+  </div>
+  <div class="card" id="case-head"></div>
+  <div class="card">
+    <h2>平衡電位と静止膜電位</h2>
+    <div class="figure" id="case-diagram"></div>
+    <p class="hint">点 = 各イオンの平衡電位（活量で計算）。太線 = この細胞の静止膜電位、破線 = 生体の静止膜電位。点が太線から離れているほど、そのイオンを流そうとする力が強いことを表します。</p>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>イオンごとの値</h2><div class="tablewrap" id="case-species"></div></div>
+    <div class="card"><h2>細胞内・外の物理量</h2><div class="tablewrap" id="case-summary"></div>
+      <p class="hint">A⁻ は不透過陰イオン（タンパク質など）で、電気的中性が保たれるように量を自動で決めています。</p></div>
+  </div>
+</section>
+
+<!-- ===================== 組み合わせ ===================== -->
+<section class="tab" id="tab-grid">
+  <div class="card">
+    <h2>2つの持ち場の全組み合わせ</h2>
+    <div class="row"><span class="lbl">縦軸</span><div class="seg" id="seg-gy"></div></div>
+    <div class="row"><span class="lbl">横軸</span><div class="seg" id="seg-gx"></div></div>
+    <div class="row"><span class="lbl">濃度の決め方</span><div class="seg" id="seg-grule"></div></div>
+    <div class="row"><span class="lbl">色で表す値</span><div class="seg" id="seg-gval"></div></div>
+    <div class="row"><span class="lbl">候補</span>
+      <label class="chk"><input type="checkbox" id="gz1"> 1価</label>
+      <label class="chk"><input type="checkbox" id="gz2"> 2価</label>
+      <label class="chk"><input type="checkbox" id="gz3"> 3価</label>
+      <label class="chk"><input type="checkbox" id="gB"> 区分 B（加水分解しやすい）も含める</label>
+    </div>
+    <p class="hint" id="grid-fixed"></p>
+  </div>
+  <div class="card">
+    <div class="hm-wrap" id="grid-heatmap"></div>
+    <div class="legend" id="grid-legend"></div>
+    <p class="hint">マスをタップすると詳細が出ます。灰色は物理的に成り立たない組み合わせ（体積超過・中性不可）か、同じイオンが2つの持ち場に入っている組み合わせです。</p>
+  </div>
+  <div class="card" id="grid-detail" hidden></div>
+  <div class="grid2">
+    <div class="card"><h2>まとめ</h2><div id="grid-summary"></div></div>
+    <div class="card"><h2>判定ごとの件数</h2><div class="tablewrap" id="grid-flags"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>最も脱分極する組み合わせ</h2><div class="tablewrap" id="grid-top"></div></div>
+    <div class="card"><h2>最も過分極する組み合わせ</h2><div class="tablewrap" id="grid-bottom"></div></div>
+  </div>
+  <div class="card"><button class="btn" id="btn-csv">この表を CSV で保存</button>
+    <p class="hint">表示中の全組み合わせ（存在できないものも含む）を CSV ファイルに書き出します。</p></div>
+</section>
+
+<!-- ===================== 透過性 P ===================== -->
+<section class="tab" id="tab-perm">
+  <div class="card">
+    <h2>較正したチャネルのパラメータ</h2>
+    <div class="tablewrap" id="perm-params"></div>
+    <p class="hint">実測された透過性比に合うように、チャネルごとに 4 つのパラメータを当てはめています（差分進化法）。残差二乗和が小さいほど、実測値をよく再現できています。</p>
+  </div>
+  <div class="card">
+    <h2>予測した相対透過性</h2>
+    <div class="row" style="margin-top:0"><span class="lbl">チャネル</span><div class="seg" id="seg-prole"></div></div>
+    <div class="figure" id="perm-chart" style="margin-top:8px"></div>
+    <p class="hint">縦軸 = log₁₀(P / P<sub>元のイオン</sub>)、低濃度での値です。0 なら元のイオンと同じ通りやすさ、−3 なら 1/1000 です。−6 より下は「通れない」とみなして切り捨てて表示しています。実際の計算では、これに詰まり（ブロック）の効果が掛かります。</p>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>較正データの再現</h2><div class="tablewrap" id="perm-calib"></div>
+      <p class="hint">「&lt; 値」は上限だけが分かっているデータです。モデルの値がそれ以下なら合格です。</p></div>
+    <div class="card"><h2>予測値の一覧</h2><div class="tablewrap" id="perm-table"></div></div>
+  </div>
+</section>
+
+<!-- ===================== イオン表 ===================== -->
+<section class="tab" id="tab-ions">
+  <div class="card"><h2>候補イオン</h2><div class="tablewrap" id="ions-table"></div>
+    <p class="hint">* は推定値（水和半径は同じ価数の平均、水和自由エネルギーは Latimer–Born 式で補っています）。区分 A：自由イオンとして安定 / B：中性の水では加水分解・沈殿しやすい。</p></div>
+  <div class="grid2">
+    <div class="card"><h2>同じ体積に入りうるイオンの上限</h2><div class="figure" id="ions-cmax"></div>
+      <p class="hint">Cl⁻ との塩として、水和したイオンを最密に詰めたときの最大濃度です（対数目盛）。破線は生体の細胞外 Na⁺（0.145 M）。</p></div>
+    <div class="card"><h2>イオン同士の相互作用による実効濃度の低下</h2><div class="figure" id="ions-davies"></div>
+      <p class="hint">Davies 式による活量係数 γ。点線 = 適用上限（設定値）、破線 = 生体の細胞外液のイオン強度。</p></div>
+  </div>
+</section>
+
+<!-- ===================== 設定 ===================== -->
+<section class="tab" id="tab-settings">
+  <div class="card"><h2>持ち場ごとの生体の値</h2><div class="tablewrap" id="set-roles"></div>
+    <p class="hint">P は静止時の相対透過性（K = 1）。K<sub>d</sub> はチャネルの見かけの解離定数で、詰まり（ブロック）の計算に使います。</p></div>
+  <div class="card"><h2>全体の条件</h2><div class="form" id="set-general"></div></div>
+  <div class="card"><h2>透過性 P モデル</h2><div class="form" id="set-pmodel"></div></div>
+  <div class="card">
+    <h2>較正データ（JSON）</h2>
+    <p class="hint" style="margin-top:0">元のイオンに対する透過性比です。["&lt;", 値] は上限値を表します。変更したら「適用」を押すと、較正をやり直します。</p>
+    <textarea id="set-calib" spellcheck="false"></textarea>
+    <div class="row"><button class="btn" id="btn-calib">適用</button><span class="msg" id="calib-msg"></span></div>
+  </div>
+  <div class="card">
+    <h2>表示とリセット</h2>
+    <div class="row" style="margin-top:0"><span class="lbl">画面の色</span><div class="seg" id="seg-theme"></div></div>
+    <div class="row"><button class="btn ghost" id="btn-reset">すべての設定を既定値に戻す</button></div>
+    <p class="hint">設定はこのブラウザの中だけに保存されます。</p>
+  </div>
+</section>
+
+<!-- ===================== 説明 ===================== -->
+<section class="tab" id="tab-help">
+  <div class="card prose">
+    <h2>このアプリでできること</h2>
+    <p>神経細胞で働く Na⁺・K⁺・Ca²⁺ を別の金属イオンに置き換えたとき、平衡電位と静止膜電位がどう変わるか、その状態が物理的に成り立つかを試算します。Google Colab で作ったシミュレーションと同じ式を使っています。</p>
+    <h3>持ち場（Na役・K役・Ca役）</h3>
+    <p>「Na役」は Na⁺ という名前ではなく、<b>生体で Na⁺ が担っている持ち場</b>（濃度の配置と、通るチャネル）のことです。</p>
+    <ul>
+      <li><b>Na役</b>：外に多く内に少ない。速く開くチャネルを通って流れ込み、脱分極させる（活動電位の立ち上がり）。</li>
+      <li><b>K役</b>：内に多く外に少ない。流れ出して膜を元に戻す。静止膜電位を決める。</li>
+      <li><b>Ca役</b>：内が極めて少ない。流れ込むこと自体が信号になる。静止時のチャネルはほぼ閉じている。</li>
+    </ul>
+    <h3>濃度の決め方</h3>
+    <ul>
+      <li><b>同モル</b>：元のイオンと同じ mM。</li>
+      <li><b>同電荷</b>：z × 濃度 を元と同じにする。</li>
+      <li><b>同体積</b>：水和したイオンが占める体積を元と同じにする。</li>
+    </ul>
+    <p>3つとも細胞内外の濃度比は変えません。そのため理想溶液の Nernst 電位は価数だけで決まります。濃度の絶対値は、活量・電気的中性・浸透圧・GHK 静止膜電位を通じて効いてきます。</p>
+    <h3>使っている式</h3>
+    <div class="eq">E = (RT / zF) ln(a<sub>out</sub> / a<sub>in</sub>)、 a = γ c</div>
+    <div class="eq">I<sub>i</sub>(V) = P<sub>i</sub> z<sub>i</sub> F u (a<sub>in</sub> − a<sub>out</sub> e<sup>−u</sup>) / (1 − e<sup>−u</sup>)、 u = z<sub>i</sub>FV/RT、 Σ I<sub>i</sub>(V<sub>rest</sub>) = 0</div>
+    <div class="eq">log₁₀ γ = −A z² (√I / (1 + √I) − 0.3 I)（Davies 式）</div>
+    <div class="eq">G<sub>well</sub> = f |ΔG<sub>hyd</sub>| − K z q / (r + r<sub>site</sub>)、 P<sub>0</sub> ∝ (1 − r/r<sub>pore</sub>)² exp(−α G<sub>well</sub>/RT)、 P = P<sub>0</sub> / (1 + c/K<sub>d</sub>)</div>
+    <h3>透過性 P の決め方</h3>
+    <ul>
+      <li><b>継承</b>：受容体も完全に置き換える。P は元のイオンと同じ。</li>
+      <li><b>既存チャネル</b>：元のチャネルのまま、新しいイオンを通す（実測値で較正）。</li>
+      <li><b>相似チャネル</b>：チャネルの大きさを新しいイオンに合わせて作り直す。イオン固有の差（脱水和のしにくさ・価数）だけが残る。</li>
+    </ul>
+    <h3>判定</h3>
+    <ul>
+      <li><b>体積超過</b>（φ が上限を超える）・<b>中性不可</b>（陰イオンが余る）→ 存在できない</li>
+      <li><b>Davies範囲外</b>（I が上限を超える）・<b>浸透圧差</b>・<b>イオン対</b>（Bjerrum 比 &gt; 1）→ 注意</li>
+      <li><b>軟イオン</b>・<b>価数外挿</b> → 透過性の予測が不確か</li>
+    </ul>
+    <h3>限界</h3>
+    <ul>
+      <li>静止状態だけを扱っています。活動電位の形は扱っていません（次の段階で HH モデルを追加する予定）。</li>
+      <li>水和したイオンを硬い球とみなす近似です。不透過陰イオンは 1 種類にまとめています。</li>
+      <li>浸透圧差による細胞の体積変化や、Na/K ポンプでの輸送は計算していません。</li>
+      <li>P モデルは結合部位が 1 つという近似です。Caチャネルの較正値は概略値です。</li>
+    </ul>
+  </div>
+</section>
+</main>
+<footer>イオン置換ラボ ・ 教育・研究の試算用です。数値は近似モデルによる目安です。</footer>
+
+<script>
+// <model>
+const Model = (() => {
+  const R = 8.314462618, F = 96485.33212, NA = 6.02214076e23, QE = 1.602176634e-19;
+  const KB = 1.380649e-23, EPS0 = 8.8541878128e-12, K_COUL = 1389.35;
+
+  // 記号, 名前, z, イオン半径[Å], 水和半径[Å](Nightingale), 水和ΔG[kJ/mol](Marcus), D25[1e-9 m²/s], 区分, 備考
+  const ION_DATA = [
+    ["Li+", "リチウム", 1, 0.76, 3.82, -475, 1.029, "A", "Naチャネルを通る"],
+    ["Na+", "ナトリウム", 1, 1.02, 3.58, -365, 1.334, "A", "生体イオン"],
+    ["K+", "カリウム", 1, 1.38, 3.31, -295, 1.957, "A", "生体イオン"],
+    ["Rb+", "ルビジウム", 1, 1.52, 3.29, -275, 2.072, "A", "Kの代替"],
+    ["Cs+", "セシウム", 1, 1.67, 3.29, -250, 2.056, "A", "Kチャネルをふさぐ"],
+    ["Tl+", "タリウム", 1, 1.50, 3.30, -300, 1.989, "A", "毒性が強い"],
+    ["Ag+", "銀", 1, 1.15, 3.41, -430, 1.648, "A", "Cl⁻と沈殿(AgCl)"],
+    ["Mg2+", "マグネシウム", 2, 0.72, 4.28, -1830, 0.706, "A", "生体イオン"],
+    ["Ca2+", "カルシウム", 2, 1.00, 4.12, -1505, 0.792, "A", "生体イオン"],
+    ["Sr2+", "ストロンチウム", 2, 1.18, 4.12, -1380, 0.791, "A", "Caの代替"],
+    ["Ba2+", "バリウム", 2, 1.35, 4.04, -1250, 0.847, "A", "Kチャネルをふさぐ"],
+    ["Mn2+", "マンガン", 2, 0.83, 4.38, -1760, 0.712, "A", "微量元素"],
+    ["Fe2+", "鉄(II)", 2, 0.78, 4.28, -1840, 0.719, "A", "酸化されやすい"],
+    ["Co2+", "コバルト", 2, 0.745, 4.23, -1915, 0.732, "A", "Caチャネルをふさぐ"],
+    ["Ni2+", "ニッケル", 2, 0.69, 4.04, -1980, 0.661, "A", "T型Caチャネルをふさぐ"],
+    ["Cu2+", "銅(II)", 2, 0.73, 4.19, -2010, 0.714, "A", "タンパク質に結合"],
+    ["Zn2+", "亜鉛", 2, 0.74, 4.30, -1955, 0.703, "A", "シナプスの信号"],
+    ["Cd2+", "カドミウム", 2, 0.95, 4.26, -1755, 0.719, "A", "毒性あり"],
+    ["Hg2+", "水銀", 2, 1.02, null, -1760, null, "A", "毒性が強い"],
+    ["Pb2+", "鉛", 2, 1.19, 4.01, -1425, 0.945, "A", "毒性あり"],
+    ["Be2+", "ベリリウム", 2, 0.45, 4.59, -2395, null, "B", "加水分解・毒性"],
+    ["Al3+", "アルミニウム", 3, 0.535, 4.75, -4525, 0.541, "B", "Al(OH)₃として沈殿"],
+    ["Fe3+", "鉄(III)", 3, 0.645, 4.57, -4265, 0.604, "B", "自由イオンはほぼ0"],
+    ["Cr3+", "クロム(III)", 3, 0.615, 4.61, null, null, "B", "加水分解"],
+    ["Ga3+", "ガリウム", 3, 0.62, null, null, null, "B", "加水分解"],
+    ["La3+", "ランタン", 3, 1.032, 4.52, -3145, 0.619, "B", "Caチャネルをふさぐ"],
+    ["Gd3+", "ガドリニウム", 3, 0.938, null, null, null, "B", "伸展活性化チャネルをふさぐ"],
+  ];
+  const SOFT = new Set(["Tl+", "Ag+", "Cu2+", "Cd2+", "Hg2+", "Pb2+"]);
+  const ORDER = ION_DATA.map(d => d[0]);
+  const ions = {};
+  ION_DATA.forEach(([sym, name, z, r, rHyd, dG, D25, cat, note]) => {
+    ions[sym] = { sym, name, z, r, rHyd, dG, D25, cat, note,
+                  rHydEst: rHyd == null, dGEst: dG == null, soft: SOFT.has(sym) };
+  });
+  for (const z of [1, 2, 3]) {
+    const known = ORDER.map(s => ions[s]).filter(i => i.z === z && i.rHyd != null).map(i => i.rHyd);
+    const mean = known.reduce((a, b) => a + b, 0) / known.length;
+    ORDER.map(s => ions[s]).filter(i => i.z === z && i.rHyd == null).forEach(i => { i.rHyd = mean; });
+  }
+  ORDER.forEach(s => {
+    const i = ions[s];
+    if (i.dG == null) i.dG = -685.8 * i.z * i.z / (i.r + 0.85);   // Latimer–Born 式
+    i.vHyd = 4 / 3 * Math.PI * i.rHyd ** 3;                        // [Å³]
+  });
+
+  const ROLE_KEYS = ["Na", "K", "Ca"];
+  const ROLE_LABEL = { Na: "Na役", K: "K役", Ca: "Ca役" };
+  const ROLE_DESC = { Na: "脱分極担当", K: "再分極・静止担当", Ca: "信号担当" };
+  const RULES = ["同モル", "同電荷", "同体積"];
+  const P_MODELS = ["継承", "既存チャネル", "相似チャネル"];
+  const FIT_BOUNDS = [[0, 1], [0, 3], [0.5, 3], [0.8, 3.5]];   // f, q, r_site, r_pore
+
+  function defaults() {
+    return {
+      T_C: 37,
+      roles: {
+        Na: { native: "Na+", cOut: 145, cIn: 12, P: 0.05 },
+        K: { native: "K+", cOut: 4, cIn: 140, P: 1.0 },
+        Ca: { native: "Ca2+", cOut: 2, cIn: 1e-4, P: 0 },
+      },
+      cl: { cOut: 110, cIn: 10, P: 0.45, rHyd: 3.32 },
+      imp: { z: -1, rHyd: 3.5 },
+      useActivity: true, phiMax: 0.64, iMax: 0.5, osmTol: 0.05,
+      pModel: "既存チャネル", alpha: 0.5, useBlock: true, scaleSiteCharge: false,
+      kdNative: { Na: 0.37, K: 0.3, Ca: 0.014 },
+      calib: {
+        Na: { "Li+": 0.93, "Na+": 1.0, "K+": 0.086, "Rb+": ["<", 0.012], "Cs+": ["<", 0.013] },
+        K: { "K+": 1.0, "Rb+": 0.92, "Cs+": ["<", 0.077], "Na+": ["<", 0.010], "Li+": ["<", 0.018] },
+        Ca: { "Ca2+": 1.0, "Sr2+": 0.67, "Ba2+": 0.4, "Na+": 0.001, "K+": 0.00033 },
+      },
+      assign: { Na: "Na+", K: "K+", Ca: "Ca2+" },
+      rule: "同モル",
+      ui: { gy: "Na", gx: "K", grule: "同モル", gval: "V", gz: [1, 2, 3], gB: true, prole: "Na", theme: "auto" },
+    };
+  }
+
+  function env(cfg) {
+    const tc = cfg.T_C, T = tc + 273.15;
+    const epsR = 87.74 - 0.40008 * tc + 9.398e-4 * tc * tc - 1.41e-6 * tc ** 3;   // 水の比誘電率
+    const rho = 1 - 3.17e-6 * (tc - 3.98) ** 2;                                     // 水の密度の近似 [g/cm³]
+    const visc = T2 => 0.02939 * Math.exp(507.88 / (T2 - 149.3));                  // 水の粘度 [mPa·s]
+    return {
+      T, tc, epsR, rho,
+      RT_kJ: R * T / 1000, RTF: R * T / F,
+      A: 1.82483e6 * Math.sqrt(rho) / Math.pow(epsR * T, 1.5),
+      lB_nm: QE * QE / (4 * Math.PI * EPS0 * epsR * KB * T) * 1e9,
+      dScale: (T / 298.15) * (visc(298.15) / visc(T)),
+    };
+  }
+
+  function derived(cfg, E, sym) {
+    const i = ions[sym], vCl = 4 / 3 * Math.PI * cfg.cl.rHyd ** 3;
+    return {
+      cMax: cfg.phiMax / (NA * (i.vHyd + i.z * vCl) * 1e-30) / 1000,
+      bjerrum: (i.z * E.lB_nm * 10 / 2) / (i.rHyd + cfg.cl.rHyd),
+      D: i.D25 == null ? null : i.D25 * E.dScale,
+    };
+  }
+
+  const nernst = (z, cIn, cOut, E) => 1000 * E.RTF / z * Math.log(cOut / cIn);
+  function ghkI(V, z, P, cIn, cOut, E) {
+    const u = z * V / E.RTF;
+    if (Math.abs(u) < 1e-9) return P * z * F * (cIn - cOut);
+    return P * z * F * u * (cIn - cOut * Math.exp(-u)) / (1 - Math.exp(-u));
+  }
+  function davies(z, I, A) {
+    const s = Math.sqrt(I);
+    return Math.pow(10, -A * z * z * (s / (1 + s) - 0.3 * I));
+  }
+  function roleConc(cfg, role, ion, rule) {
+    const r = cfg.roles[role], nat = ions[r.native], x = ions[ion];
+    const k = rule === "同電荷" ? nat.z / x.z : rule === "同体積" ? nat.vHyd / x.vHyd : 1;
+    return [r.cIn * k, r.cOut * k];
+  }
+
+  // ---------- 透過性 P モデル ----------
+  const steric = (r, rp) => { const x = Math.min(r / rp, 1); return (1 - x) ** 2; };
+  function wellE(sym, th, rs = 1, qs = 1) {
+    const i = ions[sym];
+    return th[0] * (-i.dG) - K_COUL * i.z * th[1] * qs / (i.r + th[2] * rs);
+  }
+  function logP0(sym, th, alpha, RTk, rs = 1, qs = 1) {
+    const S = steric(ions[sym].r, th[3] * rs);
+    if (S <= 0) return -Infinity;
+    return Math.log(S) - alpha * wellE(sym, th, rs, qs) / RTk;
+  }
+  function mulberry(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function optimize(loss, bounds, seed = 20261023) {
+    const rnd = mulberry(seed), d = bounds.length, NP = 40, G = 300, Fm = 0.7, CR = 0.9;
+    const clip = (v, j) => Math.min(bounds[j][1], Math.max(bounds[j][0], v));
+    const pop = [], fit = [];
+    for (let i = 0; i < NP; i++) {
+      const x = bounds.map(([lo, hi]) => lo + rnd() * (hi - lo));
+      pop.push(x); fit.push(loss(x));
+    }
+    for (let g = 0; g < G; g++) {
+      for (let i = 0; i < NP; i++) {
+        let a, b, c;
+        do a = (rnd() * NP) | 0; while (a === i);
+        do b = (rnd() * NP) | 0; while (b === i || b === a);
+        do c = (rnd() * NP) | 0; while (c === i || c === a || c === b);
+        const jr = (rnd() * d) | 0;
+        const t = pop[i].map((v, j) => (j === jr || rnd() < CR) ? clip(pop[a][j] + Fm * (pop[b][j] - pop[c][j]), j) : v);
+        const ft = loss(t);
+        if (ft <= fit[i]) { pop[i] = t; fit[i] = ft; }
+      }
+    }
+    let bi = 0;
+    for (let i = 1; i < NP; i++) if (fit[i] < fit[bi]) bi = i;
+    let x = pop[bi].slice(), fx = fit[bi];
+    let step = bounds.map(([lo, hi]) => (hi - lo) * 0.05);
+    for (let it = 0; it < 80; it++) {
+      let improved = false;
+      for (let j = 0; j < d; j++) for (const s of [1, -1]) {
+        const y = x.slice(); y[j] = clip(y[j] + s * step[j], j);
+        const fy = loss(y);
+        if (fy < fx) { x = y; fx = fy; improved = true; }
+      }
+      if (!improved) step = step.map(v => v / 2);
+    }
+    return { x, f: fx };
+  }
+  function fitChannel(cfg, E, role) {
+    const nat = cfg.roles[role].native, data = cfg.calib[role] || {};
+    const loss = th => {
+      const ref = logP0(nat, th, cfg.alpha, E.RT_kJ);
+      if (!isFinite(ref)) return 1e6;
+      let s = 0;
+      for (const [sym, v] of Object.entries(data)) {
+        if (!ions[sym]) continue;
+        const lp = logP0(sym, th, cfg.alpha, E.RT_kJ) - ref;
+        let res;
+        if (Array.isArray(v)) res = isFinite(lp) ? Math.max(0, lp - Math.log(v[1])) : 0;
+        else res = isFinite(lp) ? lp - Math.log(v) : 20;
+        s += res * res;
+      }
+      return s;
+    };
+    const { x, f } = optimize(loss, FIT_BOUNDS);
+    return { theta: x, err: f };
+  }
+  function fitAll(cfg, E) {
+    const out = {};
+    ROLE_KEYS.forEach(r => { out[r] = fitChannel(cfg, E, r); });
+    return out;
+  }
+  function calibZ(cfg, role) {
+    return new Set(Object.keys(cfg.calib[role] || {}).filter(s => ions[s]).map(s => ions[s].z));
+  }
+  function scales(cfg, role, sym, mode) {
+    if (mode !== "相似チャネル") return [1, 1];
+    const nat = ions[cfg.roles[role].native], x = ions[sym];
+    return [x.r / nat.r, cfg.scaleSiteCharge ? x.z / nat.z : 1];
+  }
+  function logPRatioLow(cfg, E, fits, role, sym, mode = cfg.pModel) {
+    const th = fits[role].theta, nat = cfg.roles[role].native;
+    const [rs, qs] = scales(cfg, role, sym, mode);
+    return logP0(sym, th, cfg.alpha, E.RT_kJ, rs, qs) - logP0(nat, th, cfg.alpha, E.RT_kJ);
+  }
+  function logKd(cfg, E, fits, role, sym, mode = cfg.pModel) {
+    const th = fits[role].theta, nat = cfg.roles[role].native;
+    const [rs, qs] = scales(cfg, role, sym, mode);
+    return Math.log(cfg.kdNative[role]) + (wellE(sym, th, rs, qs) - wellE(nat, th)) / E.RT_kJ;
+  }
+  const logaddexp = (a, b) => { const m = Math.max(a, b); return m + Math.log1p(Math.exp(-Math.abs(a - b))); };
+  function pEffective(cfg, E, fits, role, sym, cIn, cOut, mode = cfg.pModel) {
+    if (mode === "継承") return 1;
+    let lr = logPRatioLow(cfg, E, fits, role, sym, mode);
+    if (cfg.useBlock && lr > -Infinity) {
+      const r = cfg.roles[role];
+      const cIon = (cIn + cOut) / 2 / 1000, cNat = (r.cIn + r.cOut) / 2 / 1000;
+      lr += -logaddexp(0, Math.log(cIon) - logKd(cfg, E, fits, role, sym, mode))
+            + logaddexp(0, Math.log(cNat) - Math.log(cfg.kdNative[role]));
+    }
+    if (Number.isNaN(lr)) return NaN;
+    return Math.exp(Math.min(50, Math.max(-700, lr)));
+  }
+
+  // ---------- 細胞内外の組成と評価 ----------
+  function buildSystem(cfg, E, fits, assign, rule) {
+    const sp = [];
+    for (const role of ROLE_KEYS) {
+      const r = cfg.roles[role], sym = assign[role];
+      const [cIn, cOut] = roleConc(cfg, role, sym, rule);
+      const pr = pEffective(cfg, E, fits, role, sym, cIn, cOut);
+      sp.push({ name: sym, role, z: ions[sym].z, rHyd: ions[sym].rHyd, P: r.P * pr, pRatio: pr, cIn, cOut });
+    }
+    sp.push({ name: "Cl-", role: "Cl", z: -1, rHyd: cfg.cl.rHyd, P: cfg.cl.P, pRatio: 1, cIn: cfg.cl.cIn, cOut: cfg.cl.cOut });
+    let qIn = 0, qOut = 0;
+    sp.forEach(s => { qIn += s.z * s.cIn; qOut += s.z * s.cOut; });
+    sp.push({ name: "A-", role: "A", z: cfg.imp.z, rHyd: cfg.imp.rHyd, P: 0, pRatio: null,
+              cIn: Math.max(qIn / -cfg.imp.z, 0), cOut: Math.max(qOut / -cfg.imp.z, 0) });
+    return sp;
+  }
+  function analyze(cfg, E, sp) {
+    const sum = {};
+    for (const side of ["in", "out"]) {
+      const ck = side === "in" ? "cIn" : "cOut", gk = side === "in" ? "gIn" : "gOut", ak = side === "in" ? "aIn" : "aOut";
+      let I = 0, phi = 0, osm = 0, q = 0;
+      sp.forEach(s => {
+        const c = s[ck];
+        I += c * s.z * s.z; osm += c; q += s.z * c;
+        phi += c * NA * 4 / 3 * Math.PI * (s.rHyd * 1e-10) ** 3;
+      });
+      I = 0.5 * I / 1000;
+      sp.forEach(s => { const g = cfg.useActivity ? davies(s.z, I, E.A) : 1; s[gk] = g; s[ak] = g * s[ck]; });
+      sum[side] = {
+        I, phi, osm, q,
+        dist: osm > 0 ? Math.cbrt(1 / (NA * osm)) * 1e9 : NaN,
+        debye: I > 0 ? Math.sqrt(EPS0 * E.epsR * KB * E.T / (2 * NA * QE * QE * I * 1000)) * 1e9 : NaN,
+      };
+    }
+    return sum;
+  }
+  function judge(cfg, E, sum, assign) {
+    const flags = [];
+    if (Math.max(sum.in.phi, sum.out.phi) > cfg.phiMax) flags.push("体積超過");
+    if (Math.max(Math.abs(sum.in.q), Math.abs(sum.out.q)) > 1e-6) flags.push("中性不可");
+    if (Math.max(sum.in.I, sum.out.I) > cfg.iMax) flags.push("Davies範囲外");
+    const mo = (sum.in.osm + sum.out.osm) / 2;
+    if (Math.abs(sum.in.osm - sum.out.osm) / mo > cfg.osmTol) flags.push("浸透圧差");
+    if (ROLE_KEYS.some(r => derived(cfg, E, assign[r]).bjerrum > 1)) flags.push("イオン対");
+    if (cfg.pModel !== "継承") {
+      for (const role of ROLE_KEYS) {
+        const sym = assign[role];
+        if (sym === cfg.roles[role].native) continue;
+        if (ions[sym].soft) flags.push(`軟イオン(${sym})`);
+        if (!calibZ(cfg, role).has(ions[sym].z)) flags.push(`価数外挿(${ROLE_LABEL[role]})`);
+      }
+    }
+    return flags;
+  }
+  function vrest(sp, use, E) {
+    const list = sp.filter(s => s.P > 0).map(s => [s.z, s.P, use === "a" ? s.aIn : s.cIn, use === "a" ? s.aOut : s.cOut]);
+    const f = V => list.reduce((acc, [z, P, ci, co]) => acc + ghkI(V, z, P, ci, co, E), 0);
+    let lo = -0.3, hi = 0.3, flo = f(lo);
+    const fhi = f(hi);
+    if (!isFinite(flo) || !isFinite(fhi) || flo * fhi > 0) return NaN;
+    for (let k = 0; k < 80; k++) {
+      const mid = (lo + hi) / 2, fm = f(mid);
+      if (fm * flo > 0) { lo = mid; flo = fm; } else hi = mid;
+    }
+    return 1000 * (lo + hi) / 2;
+  }
+  function isUnique(assign) {
+    const v = ROLE_KEYS.map(r => assign[r]);
+    return new Set(v).size === v.length;
+  }
+  function runCase(cfg, E, fits, assign, rule) {
+    const sp = buildSystem(cfg, E, fits, assign, rule);
+    const sum = analyze(cfg, E, sp);
+    const flags = judge(cfg, E, sum, assign);
+    const ok = !flags.includes("体積超過") && !flags.includes("中性不可");
+    sp.forEach(s => {
+      s.E = s.aIn > 0 && s.aOut > 0 ? nernst(s.z, s.aIn, s.aOut, E) : NaN;
+      s.Eid = s.cIn > 0 && s.cOut > 0 ? nernst(s.z, s.cIn, s.cOut, E) : NaN;
+    });
+    return { assign: { ...assign }, rule, sp, sum, flags, ok, V: vrest(sp, "a", E), Vid: vrest(sp, "c", E) };
+  }
+
+  return { ions, ORDER, ROLE_KEYS, ROLE_LABEL, ROLE_DESC, RULES, P_MODELS, FIT_BOUNDS,
+           defaults, env, derived, davies, nernst, fitAll, calibZ, logPRatioLow, logKd,
+           runCase, isUnique, roleConc };
+})();
+// </model>
+
+/* ======================= UI ======================= */
+(() => {
+  const M = Model;
+  const $ = id => document.getElementById(id);
+  const STORE = "ion-swap-lab/cfg/v1";
+  const SUP = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "+": "⁺", "-": "⁻" };
+  const pretty = s => s.replace(/(\d*)([+-])$/, (m, d, sg) => (d || "").split("").map(c => SUP[c]).join("") + SUP[sg]);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const minus = s => s.replace(/^-/, "−");
+  function fmt(v, d = 2) {
+    if (v == null || !isFinite(v)) return "—";
+    const a = Math.abs(v);
+    if (a !== 0 && (a < 1e-3 || a >= 1e5)) return minus(v.toExponential(2));
+    return minus(v.toFixed(d));
+  }
+  const fmtmV = v => (v == null || !isFinite(v)) ? "—" : minus(v.toFixed(1));
+  const signed = v => (v == null || !isFinite(v)) ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1);
+  const ROLE_COLOR = { Na: "var(--na)", K: "var(--k)", Ca: "var(--ca)", Cl: "var(--cl)", A: "var(--a)" };
+
+  // ---------- 設定の読み込み・保存 ----------
+  function merge(base, over) {
+    if (over == null || typeof over !== "object" || Array.isArray(over)) return over === undefined ? base : over;
+    const out = Array.isArray(base) ? base.slice() : { ...base };
+    for (const k of Object.keys(over)) {
+      out[k] = (base && typeof base[k] === "object" && base[k] !== null && !Array.isArray(base[k]))
+        ? merge(base[k], over[k]) : over[k];
+    }
+    return out;
+  }
+  let cfg = M.defaults();
+  try {
+    const raw = localStorage.getItem(STORE);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      cfg = merge(cfg, saved);
+      if (saved.calib) cfg.calib = saved.calib;   // 較正データはまるごと置き換え
+    }
+  } catch (e) { /* 保存領域が使えなくても既定値で動く */ }
+  for (const r of M.ROLE_KEYS) if (!M.ions[cfg.assign[r]]) cfg.assign[r] = cfg.roles[r].native;
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) { } }
+
+  function applyTheme() {
+    const t = cfg.ui.theme;
+    if (t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+  }
+  applyTheme();
+
+  // ---------- 計算の状態 ----------
+  let E = M.env(cfg), fits = null, fitKey = "";
+  function ensureFit() {
+    const key = JSON.stringify([cfg.calib, cfg.alpha, cfg.T_C]);
+    if (key !== fitKey) { fits = M.fitAll(cfg, E); fitKey = key; }
+  }
+  const nativeAssign = () => Object.fromEntries(M.ROLE_KEYS.map(r => [r, cfg.roles[r].native]));
+  let native = null;
+  function recompute() {
+    E = M.env(cfg);
+    ensureFit();
+    native = M.runCase(cfg, E, fits, nativeAssign(), "同モル");
+    dirty = { case: true, grid: true, perm: true, ions: true, settings: true };
+    renderActive();
+  }
+
+  // ---------- 共通部品 ----------
+  function seg(el, options, get, set) {
+    el.innerHTML = options.map(([v, label]) => `<button type="button" data-v="${esc(v)}">${esc(label)}</button>`).join("");
+    const sync = () => el.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === String(get())));
+    el.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      set(b.dataset.v); sync();
+    });
+    sync();
+    return sync;
+  }
+  function ionOptions(selected) {
+    let h = "";
+    for (const z of [1, 2, 3]) {
+      h += `<optgroup label="${z}価">`;
+      M.ORDER.filter(s => M.ions[s].z === z).forEach(s => {
+        const i = M.ions[s];
+        h += `<option value="${s}"${s === selected ? " selected" : ""}>${pretty(s)}　${i.name}${i.cat === "B" ? "（加水分解しやすい）" : ""}</option>`;
+      });
+      h += "</optgroup>";
+    }
+    return h;
+  }
+  function table(head, rows, leftCols = 1) {
+    let h = "<table><thead><tr>" + head.map((c, i) => `<th class="${i < leftCols ? "l" : ""}">${c}</th>`).join("") + "</tr></thead><tbody>";
+    rows.forEach(r => {
+      const cls = r.cls ? ` class="${r.cls}"` : "";
+      const cells = r.cells || r;
+      h += `<tr${cls}>` + cells.map((c, i) => `<td class="${i < leftCols ? "l" : ""}">${c}</td>`).join("") + "</tr>";
+    });
+    return h + "</tbody></table>";
+  }
+  const comboLabel = a => M.ROLE_KEYS.map(r => pretty(a[r])).join(" / ");
+  const flagChips = (flags) => flags.length
+    ? flags.map(f => `<span class="chip${f === "体積超過" || f === "中性不可" ? " bad" : ""}">${esc(f)}</span>`).join("")
+    : `<span class="chip ok">問題なし</span>`;
+
+  // ---------- 1ケース ----------
+  const rolePickers = $("role-pickers");
+  function buildRolePickers() {
+    rolePickers.innerHTML = M.ROLE_KEYS.map(r => {
+      const R = cfg.roles[r];
+      return `<label class="role ${r}"><span class="rn">${M.ROLE_LABEL[r]}<span class="rd">　${M.ROLE_DESC[r]}</span></span>
+        <span class="rd">生体: ${pretty(R.native)}（外 ${fmt(R.cOut, R.cOut < 1 ? 4 : 0)} / 内 ${fmt(R.cIn, R.cIn < 1 ? 4 : 0)} mM、静止時 P = ${R.P}）</span>
+        <select data-role="${r}">${ionOptions(cfg.assign[r])}</select></label>`;
+    }).join("");
+  }
+  rolePickers.addEventListener("change", e => {
+    const s = e.target.closest("select"); if (!s) return;
+    cfg.assign[s.dataset.role] = s.value; save(); dirty.case = true; renderCase();
+  });
+  const syncRule = seg($("seg-rule"), M.RULES.map(v => [v, v]), () => cfg.rule, v => { cfg.rule = v; save(); dirty.case = true; renderCase(); });
+  const syncPModel = seg($("seg-pmodel"), M.P_MODELS.map(v => [v, v]), () => cfg.pModel, v => { cfg.pModel = v; save(); recompute(); });
+  $("chk-activity").addEventListener("change", e => { cfg.useActivity = e.target.checked; save(); recompute(); });
+  $("chk-block").addEventListener("change", e => { cfg.useBlock = e.target.checked; save(); recompute(); });
+  $("btn-native").addEventListener("click", () => { cfg.assign = nativeAssign(); save(); buildRolePickers(); dirty.case = true; renderCase(); });
+
+  function renderCase() {
+    $("chk-activity").checked = cfg.useActivity;
+    $("chk-block").checked = cfg.useBlock;
+    syncRule(); syncPModel();
+    const res = M.runCase(cfg, E, fits, cfg.assign, cfg.rule);
+    const dup = !M.isUnique(cfg.assign);
+    const dV = res.V - native.V;
+    $("case-head").innerHTML = `
+      <div class="headline">
+        <div>
+          <div class="kicker">静止膜電位（${cfg.useActivity ? "活量" : "濃度"}で計算）</div>
+          <div class="big">${fmtmV(res.V)} <span>mV</span></div>
+          <div class="sub">生体との差 ${signed(dV)} mV ・ 濃度（理想溶液）で計算すると ${fmtmV(res.Vid)} mV ・ 生体 ${fmtmV(native.V)} mV</div>
+        </div>
+        <div class="status ${res.ok && !dup ? "ok" : "bad"}">${dup ? "同じイオンが重複" : res.ok ? "存在可能" : "存在不可"}</div>
+      </div>
+      <div class="combo">${comboLabel(res.assign)}</div>
+      <div class="kicker">Na役 / K役 / Ca役 の順 ・ 規則: ${esc(cfg.rule)} ・ P: ${esc(cfg.pModel)}</div>
+      <div class="chips">${flagChips(res.flags)}${dup ? '<span class="chip bad">同じイオンが2つの持ち場に入っています</span>' : ""}</div>`;
+    $("case-diagram").innerHTML = potentialDiagram(res);
+    $("case-species").innerHTML = table(
+      ["持ち場", "イオン", "z", "外 mM", "内 mM", "γ外", "γ内", "P", "P比", "E mV", "E理想 mV"],
+      res.sp.map(s => [
+        `<span class="dot" style="background:${ROLE_COLOR[s.role]}"></span>${s.role === "Cl" ? "Cl⁻" : s.role === "A" ? "不透過" : M.ROLE_LABEL[s.role]}`,
+        pretty(s.name), s.z > 0 ? "+" + s.z : minus(String(s.z)), fmt(s.cOut, 2), fmt(s.cIn, 2),
+        fmt(s.gOut, 3), fmt(s.gIn, 3), fmt(s.P, 3), s.pRatio == null ? "—" : fmt(s.pRatio, 3),
+        fmtmV(s.E), fmtmV(s.Eid)]), 1);
+    const S = res.sum, ns = native.sum;
+    const sumRows = [
+      ["イオン強度 [M]", "I", 3], ["体積分率 φ", "phi", 4], ["浸透圧 [mOsm]", "osm", 1],
+      ["電荷残差 [mM]", "q", 3], ["平均イオン間距離 [nm]", "dist", 2], ["Debye 長 [nm]", "debye", 2],
+    ].map(([label, k, d]) => [label, fmt(S.in[k], d), fmt(S.out[k], d), `<span style="color:var(--muted)">${fmt(ns.in[k], d)} / ${fmt(ns.out[k], d)}</span>`]);
+    $("case-summary").innerHTML = table(["量", "細胞内", "細胞外", "生体（内 / 外）"], sumRows, 1);
+    dirty.case = false;
+  }
+
+  function potentialDiagram(res) {
+    const items = res.sp.filter(s => s.role !== "A");
+    const vals = items.map(s => s.E).concat([res.V, native.V]).filter(isFinite);
+    let lo = Math.min(-150, ...vals), hi = Math.max(150, ...vals);
+    lo = Math.max(-300, Math.floor(lo / 50) * 50); hi = Math.min(300, Math.ceil(hi / 50) * 50);
+    const W = 680, L = 90, Rr = 650, rowH = 34, top = 18, H = top + items.length * rowH + 36;
+    const x = v => L + (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo) * (Rr - L);
+    let g = "";
+    for (let t = lo; t <= hi; t += 50) {
+      g += `<line x1="${x(t)}" x2="${x(t)}" y1="${top - 6}" y2="${H - 30}" stroke="var(--line)"/>`;
+      g += `<text x="${x(t)}" y="${H - 14}" font-size="12" text-anchor="middle" class="mut">${minus(String(t))}</text>`;
+    }
+    g += `<text x="${Rr}" y="${H - 1}" font-size="11.5" text-anchor="end" class="mut">膜電位 [mV]（細胞外を 0 とする）</text>`;
+    items.forEach((s, k) => {
+      const y = top + k * rowH + rowH / 2;
+      const label = s.role === "Cl" ? "Cl⁻" : `${M.ROLE_LABEL[s.role]} ${pretty(s.name)}`;
+      g += `<text x="${L - 10}" y="${y + 4}" font-size="13" text-anchor="end">${label}</text>`;
+      if (isFinite(s.E)) {
+        const off = s.E < lo || s.E > hi;
+        g += `<circle cx="${x(s.E)}" cy="${y}" r="7" fill="${ROLE_COLOR[s.role]}"${off ? ' fill-opacity="0.45"' : ""}/>`;
+        const tx = x(s.E) + (s.E > (lo + hi) / 2 ? -12 : 12);
+        g += `<text x="${tx}" y="${y + 4}" font-size="12" text-anchor="${s.E > (lo + hi) / 2 ? "end" : "start"}">${fmtmV(s.E)}${off ? "（範囲外）" : ""}</text>`;
+      }
+    });
+    if (isFinite(native.V)) g += `<line x1="${x(native.V)}" x2="${x(native.V)}" y1="${top - 8}" y2="${H - 30}" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+    if (isFinite(res.V)) {
+      g += `<line x1="${x(res.V)}" x2="${x(res.V)}" y1="${top - 8}" y2="${H - 30}" stroke="var(--ink)" stroke-width="3"/>`;
+      g += `<text x="${x(res.V) + 5}" y="${top - 2}" font-size="12" font-weight="700">V_rest ${fmtmV(res.V)}</text>`;
+    }
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="平衡電位と静止膜電位">${g}</svg>`;
+  }
+
+  // ---------- 組み合わせ ----------
+  let gridRes = null, gridSel = null;
+  const roleOpts = M.ROLE_KEYS.map(r => [r, M.ROLE_LABEL[r]]);
+  const syncGy = seg($("seg-gy"), roleOpts, () => cfg.ui.gy, v => {
+    if (v === cfg.ui.gx) cfg.ui.gx = cfg.ui.gy;
+    cfg.ui.gy = v; save(); syncGx(); dirty.grid = true; renderGrid();
+  });
+  const syncGx = seg($("seg-gx"), roleOpts, () => cfg.ui.gx, v => {
+    if (v === cfg.ui.gy) cfg.ui.gy = cfg.ui.gx;
+    cfg.ui.gx = v; save(); syncGy(); dirty.grid = true; renderGrid();
+  });
+  const syncGrule = seg($("seg-grule"), M.RULES.map(v => [v, v]), () => cfg.ui.grule, v => { cfg.ui.grule = v; save(); dirty.grid = true; renderGrid(); });
+  const GVALS = [["V", "静止膜電位"], ["phi", "体積分率 φ"], ["I", "イオン強度"], ["osm", "浸透圧差"]];
+  const syncGval = seg($("seg-gval"), GVALS, () => cfg.ui.gval, v => { cfg.ui.gval = v; save(); drawHeatmap(); });
+  ["gz1", "gz2", "gz3"].forEach((id, k) => $(id).addEventListener("change", e => {
+    const z = k + 1, set = new Set(cfg.ui.gz);
+    e.target.checked ? set.add(z) : set.delete(z);
+    cfg.ui.gz = [...set].sort(); save(); dirty.grid = true; renderGrid();
+  }));
+  $("gB").addEventListener("change", e => { cfg.ui.gB = e.target.checked; save(); dirty.grid = true; renderGrid(); });
+
+  const candidates = () => M.ORDER.filter(s => cfg.ui.gz.includes(M.ions[s].z) && (cfg.ui.gB || M.ions[s].cat === "A"));
+  function computeGrid() {
+    const cand = candidates(), ry = cfg.ui.gy, rx = cfg.ui.gx, rule = cfg.ui.grule;
+    const cells = [];
+    cand.forEach((sy, iy) => cand.forEach((sx, ix) => {
+      const assign = { ...cfg.assign, [ry]: sy, [rx]: sx };
+      if (!M.isUnique(assign)) { cells.push({ iy, ix, sy, sx, res: null }); return; }
+      cells.push({ iy, ix, sy, sx, res: M.runCase(cfg, E, fits, assign, rule) });
+    }));
+    return { cand, ry, rx, rule, cells };
+  }
+  function cellValue(c, mode) {
+    if (!c.res) return NaN;
+    const r = c.res;
+    if (mode === "V") return r.V;
+    if (mode === "phi") return Math.max(r.sum.in.phi, r.sum.out.phi);
+    if (mode === "I") return Math.max(r.sum.in.I, r.sum.out.I);
+    return Math.abs(r.sum.in.osm - r.sum.out.osm);
+  }
+  const lerp = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const rgb = a => `rgb(${a.join(",")})`;
+  const BLUE = hex("#2f63b5"), RED = hex("#c2382a"), MID = hex("#f4f4f2"), SEQ0 = hex("#eef3fa"), SEQ1 = hex("#203f7a");
+  function divColor(t) { t = Math.max(-1, Math.min(1, t)); return rgb(t < 0 ? lerp(MID, BLUE, -t) : lerp(MID, RED, t)); }
+  function seqColor(t) { t = Math.max(0, Math.min(1, t)); return rgb(lerp(SEQ0, SEQ1, Math.sqrt(t))); }
+
+  function drawHeatmap() {
+    if (!gridRes) return;
+    syncGval();
+    const { cand, cells } = gridRes, mode = cfg.ui.gval, n = cand.length;
+    if (!n) { $("grid-heatmap").innerHTML = '<p class="hint" style="padding:12px">候補のイオンがありません。上のチェックを入れてください。</p>'; $("grid-legend").innerHTML = ""; return; }
+    const cs = 22, L = 64, T = 64;
+    const W = L + n * cs + 8, H = T + n * cs + 8;
+    const shown = cells.filter(c => c.res && c.res.ok);
+    const vals = shown.map(c => cellValue(c, mode)).filter(isFinite);
+    let color, legend;
+    if (mode === "V") {
+      const span = Math.max(5, ...vals.map(v => Math.abs(v - native.V)));
+      color = v => divColor((v - native.V) / span);
+      legend = `<span>${fmtmV(native.V - span)}</span><span class="bar" style="background:linear-gradient(90deg,${divColor(-1)},${divColor(0)},${divColor(1)})"></span><span>${fmtmV(native.V + span)} mV</span><span>（中央 = 生体 ${fmtmV(native.V)} mV、青 = 過分極、赤 = 脱分極）</span>`;
+    } else {
+      const max = Math.max(1e-12, ...vals);
+      color = v => seqColor(v / max);
+      const unit = mode === "phi" ? "" : mode === "I" ? " M" : " mOsm";
+      legend = `<span>0</span><span class="bar" style="background:linear-gradient(90deg,${seqColor(0)},${seqColor(0.25)},${seqColor(1)})"></span><span>${fmt(max, 3)}${unit}</span><span>（細胞内・外のうち大きい方${mode === "osm" ? "：内外の差の絶対値" : ""}）</span>`;
+    }
+    let g = "";
+    cand.forEach((s, k) => {
+      g += `<text x="${L - 6}" y="${T + k * cs + cs / 2 + 4}" font-size="11" text-anchor="end">${pretty(s)}</text>`;
+      g += `<text transform="translate(${L + k * cs + cs / 2 + 4},${T - 6}) rotate(-90)" font-size="11">${pretty(s)}</text>`;
+    });
+    cells.forEach(c => {
+      const v = cellValue(c, mode);
+      const ok = c.res && c.res.ok && isFinite(v);
+      const sel = gridSel && gridSel.sy === c.sy && gridSel.sx === c.sx;
+      g += `<rect class="cell" data-y="${c.iy}" data-x="${c.ix}" x="${L + c.ix * cs + 1}" y="${T + c.iy * cs + 1}" width="${cs - 2}" height="${cs - 2}" rx="2" fill="${ok ? color(v) : "var(--hm-na)"}"${sel ? ' stroke="var(--ink)" stroke-width="2"' : ""}><title>${esc(`${M.ROLE_LABEL[gridRes.ry]} ${c.sy} × ${M.ROLE_LABEL[gridRes.rx]} ${c.sx}: ${ok ? fmt(v, 2) : "—"}`)}</title></rect>`;
+    });
+    g += `<text x="${L}" y="14" font-size="12" class="mut">横軸 → ${M.ROLE_LABEL[gridRes.rx]}に入れたイオン</text>`;
+    g += `<text transform="translate(14,${T + 4}) rotate(90)" font-size="12" class="mut">縦軸 ↓ ${M.ROLE_LABEL[gridRes.ry]}</text>`;
+    $("grid-heatmap").innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg>`;
+    $("grid-legend").innerHTML = legend;
+  }
+  $("grid-heatmap").addEventListener("click", e => {
+    const r = e.target.closest("rect.cell"); if (!r || !gridRes) return;
+    const c = gridRes.cells.find(c => c.iy === +r.dataset.y && c.ix === +r.dataset.x);
+    gridSel = c; drawHeatmap(); showDetail(c);
+  });
+  function showDetail(c) {
+    const box = $("grid-detail");
+    box.hidden = false;
+    if (!c.res) {
+      box.innerHTML = `<h2>${pretty(c.sy)} × ${pretty(c.sx)}</h2><p class="hint">同じイオンが2つの持ち場に入るので、計算していません。</p>`;
+      return;
+    }
+    const r = c.res;
+    box.innerHTML = `<h2>${comboLabel(r.assign)}</h2>
+      <dl class="kv">
+        <dt>静止膜電位</dt><dd>${fmtmV(r.V)} mV（生体との差 ${signed(r.V - native.V)} mV、理想溶液 ${fmtmV(r.Vid)} mV）</dd>
+        <dt>判定</dt><dd>${r.ok ? "存在可能" : "存在不可"}</dd>
+        <dt>体積分率 φ（内 / 外）</dt><dd>${fmt(r.sum.in.phi, 4)} / ${fmt(r.sum.out.phi, 4)}</dd>
+        <dt>イオン強度（内 / 外）</dt><dd>${fmt(r.sum.in.I, 3)} / ${fmt(r.sum.out.I, 3)} M</dd>
+        <dt>浸透圧差（内 − 外）</dt><dd>${fmt(r.sum.in.osm - r.sum.out.osm, 1)} mOsm</dd>
+        <dt>P（${M.ROLE_LABEL[gridRes.ry]} / ${M.ROLE_LABEL[gridRes.rx]}）</dt><dd>${fmt(r.sp.find(s => s.role === gridRes.ry).P, 3)} / ${fmt(r.sp.find(s => s.role === gridRes.rx).P, 3)}</dd>
+      </dl>
+      <div class="chips">${flagChips(r.flags)}</div>
+      <div class="row"><button class="btn" id="btn-open-case">この組み合わせを「1ケース」で開く</button></div>`;
+    $("btn-open-case").addEventListener("click", () => {
+      cfg.assign = { ...r.assign }; cfg.rule = r.rule; save();
+      buildRolePickers(); dirty.case = true; showTab("case");
+    });
+  }
+  function renderGrid() {
+    syncGy(); syncGx(); syncGrule();
+    $("gz1").checked = cfg.ui.gz.includes(1); $("gz2").checked = cfg.ui.gz.includes(2); $("gz3").checked = cfg.ui.gz.includes(3);
+    $("gB").checked = cfg.ui.gB;
+    const fixed = M.ROLE_KEYS.filter(r => r !== cfg.ui.gy && r !== cfg.ui.gx);
+    $("grid-fixed").textContent = fixed.length
+      ? `残りの持ち場は「1ケース」で選んだイオンのまま: ${fixed.map(r => `${M.ROLE_LABEL[r]} = ${pretty(cfg.assign[r])}`).join("、")}。透過性 P: ${cfg.pModel}。`
+      : "";
+    gridRes = computeGrid();
+    gridSel = null; $("grid-detail").hidden = true;
+    drawHeatmap();
+    const all = gridRes.cells.filter(c => c.res), ok = all.filter(c => c.res.ok);
+    $("grid-summary").innerHTML = `<dl class="kv">
+      <dt>計算した組み合わせ</dt><dd>${all.length} 通り</dd>
+      <dt>物理的に存在可能</dt><dd>${ok.length} 通り（${all.length ? Math.round(ok.length / all.length * 100) : 0}%）</dd>
+      <dt>静止膜電位の範囲</dt><dd>${ok.length ? `${fmtmV(Math.min(...ok.map(c => c.res.V).filter(isFinite)))} 〜 ${fmtmV(Math.max(...ok.map(c => c.res.V).filter(isFinite)))} mV` : "—"}</dd>
+      <dt>生体</dt><dd>${fmtmV(native.V)} mV</dd></dl>`;
+    const count = {};
+    all.forEach(c => { (c.res.flags.length ? c.res.flags.map(f => f.replace(/\(.*\)$/, "")) : ["問題なし"]).forEach(f => { count[f] = (count[f] || 0) + 1; }); });
+    $("grid-flags").innerHTML = table(["判定", "件数"], Object.entries(count).sort((a, b) => b[1] - a[1]).map(([k, v]) => [esc(k), v]), 1);
+    const sorted = ok.filter(c => isFinite(c.res.V)).sort((a, b) => b.res.V - a.res.V);
+    const rowsOf = list => list.map(c => [comboLabel(c.res.assign), fmtmV(c.res.V), signed(c.res.V - native.V), esc(c.res.flags.join("、") || "—")]);
+    const head = ["組み合わせ", "V mV", "差 mV", "判定"];
+    $("grid-top").innerHTML = table(head, rowsOf(sorted.slice(0, 10)), 1);
+    $("grid-bottom").innerHTML = table(head, rowsOf(sorted.slice(-10).reverse()), 1);
+    dirty.grid = false;
+  }
+  $("btn-csv").addEventListener("click", () => {
+    if (!gridRes) return;
+    const head = ["組み合わせ", ...M.ROLE_KEYS.map(r => M.ROLE_LABEL[r]), "規則", "P_MODEL", "V_rest_mV", "V_理想_mV", "ΔV_mV",
+      "φ_in", "φ_out", "I_in_M", "I_out_M", "浸透圧差_mOsm", ...M.ROLE_KEYS.map(r => "P_" + M.ROLE_LABEL[r]), "存在可能", "判定"];
+    const lines = [head.join(",")];
+    gridRes.cells.filter(c => c.res).forEach(c => {
+      const r = c.res;
+      const row = [M.ROLE_KEYS.map(k => r.assign[k]).join(" / "), ...M.ROLE_KEYS.map(k => r.assign[k]), r.rule, cfg.pModel,
+        r.V, r.Vid, r.V - native.V, r.sum.in.phi, r.sum.out.phi, r.sum.in.I, r.sum.out.I, r.sum.in.osm - r.sum.out.osm,
+        ...M.ROLE_KEYS.map(k => r.sp.find(s => s.role === k).P), r.ok, r.flags.join(" / ")];
+      lines.push(row.map(v => typeof v === "number" ? (isFinite(v) ? +v.toPrecision(6) : "") : `"${String(v).replace(/"/g, '""')}"`).join(","));
+    });
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `ion-swap_${M.ROLE_LABEL[gridRes.ry]}x${M.ROLE_LABEL[gridRes.rx]}_${gridRes.rule}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+
+  // ---------- 透過性 P ----------
+  const syncProle = seg($("seg-prole"), roleOpts, () => cfg.ui.prole, v => { cfg.ui.prole = v; save(); dirty.perm = true; renderPerm(); });
+  function renderPerm() {
+    syncProle();
+    $("perm-params").innerHTML = table(["チャネル", "f（脱水和の割合）", "q（部位の電荷 e）", "r_site Å", "r_pore Å", "残差二乗和"],
+      M.ROLE_KEYS.map(r => { const t = fits[r].theta; return [M.ROLE_LABEL[r], fmt(t[0], 3), fmt(t[1], 3), fmt(t[2], 3), fmt(t[3], 3), fmt(fits[r].err, 4)]; }), 1);
+    const rows = [];
+    M.ROLE_KEYS.forEach(r => Object.entries(cfg.calib[r] || {}).forEach(([s, v]) => {
+      if (!M.ions[s]) return;
+      const model = Math.exp(M.logPRatioLow(cfg, E, fits, r, s, "既存チャネル"));
+      const meas = Array.isArray(v) ? `&lt; ${v[1]}` : v;
+      const pass = Array.isArray(v) ? model <= v[1] * 1.05 : Math.abs(Math.log(model / v)) < Math.log(1.5);
+      rows.push([M.ROLE_LABEL[r], pretty(s), meas, fmt(model, 4), pass ? '<span class="chip ok">良好</span>' : '<span class="chip">ずれ</span>']);
+    }));
+    $("perm-calib").innerHTML = table(["チャネル", "イオン", "実測", "モデル", ""], rows, 2);
+    const role = cfg.ui.prole;
+    const data = M.ORDER.map(s => ({
+      s, z: M.ions[s].z,
+      a: M.logPRatioLow(cfg, E, fits, role, s, "既存チャネル") / Math.LN10,
+      b: M.logPRatioLow(cfg, E, fits, role, s, "相似チャネル") / Math.LN10,
+      kd: Math.exp(Math.max(-700, Math.min(700, M.logKd(cfg, E, fits, role, s, "既存チャネル")))),
+    }));
+    $("perm-chart").innerHTML = permChart(data);
+    $("perm-table").innerHTML = table(["イオン", "z", "既存 log₁₀P比", "相似 log₁₀P比", "K_d（既存）M", "注意"],
+      data.map(d => [pretty(d.s), d.z, isFinite(d.a) ? fmt(d.a, 2) : "通れない", isFinite(d.b) ? fmt(d.b, 2) : "通れない", fmt(d.kd, 3),
+        [M.ions[d.s].soft ? "軟イオン" : "", M.calibZ(cfg, role).has(d.z) ? "" : "価数外挿"].filter(Boolean).join("、") || "—"]), 1);
+    dirty.perm = false;
+  }
+  function permChart(data) {
+    const W = 680, L = 44, Rr = 670, T = 22, B = 200, n = data.length;
+    const vmax = Math.max(1, Math.ceil(Math.max(...data.flatMap(d => [d.a, d.b]).filter(isFinite).map(v => Math.min(v, 6)))));
+    const vmin = -6;
+    const y = v => T + (vmax - Math.max(vmin, Math.min(vmax, v))) / (vmax - vmin) * (B - T);
+    const w = (Rr - L) / n;
+    let g = "";
+    for (let t = vmin; t <= vmax; t += (vmax - vmin > 8 ? 2 : 1)) {
+      g += `<line x1="${L}" x2="${Rr}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/>`;
+      g += `<text x="${L - 6}" y="${y(t) + 4}" font-size="11" text-anchor="end" class="mut">${minus(String(t))}</text>`;
+    }
+    g += `<line x1="${L}" x2="${Rr}" y1="${y(0)}" y2="${y(0)}" stroke="var(--ink)"/>`;
+    data.forEach((d, i) => {
+      const x0 = L + i * w;
+      [[d.a, "var(--accent)", 0.1], [d.b, "var(--na)", 0.5]].forEach(([v, c, off]) => {
+        const vv = isFinite(v) ? v : vmin;
+        const y0 = y(0), y1 = y(vv);
+        g += `<rect x="${x0 + w * off}" y="${Math.min(y0, y1)}" width="${w * 0.38}" height="${Math.max(1, Math.abs(y1 - y0))}" fill="${c}"${isFinite(v) ? "" : ' fill-opacity="0.25"'}/>`;
+      });
+      g += `<text transform="translate(${x0 + w / 2 + 4},${B + 6}) rotate(-90)" font-size="10.5" text-anchor="end">${pretty(d.s)}</text>`;
+    });
+    g += `<rect x="${L + 6}" y="4" width="12" height="10" fill="var(--accent)"/><text x="${L + 22}" y="13" font-size="11.5">既存チャネル</text>`;
+    g += `<rect x="${L + 112}" y="4" width="12" height="10" fill="var(--na)"/><text x="${L + 128}" y="13" font-size="11.5">相似チャネル</text>`;
+    g += `<text x="${Rr}" y="13" font-size="11.5" text-anchor="end" class="mut">${M.ROLE_LABEL[cfg.ui.prole]}のチャネル（薄い棒 = 通れない）</text>`;
+    return `<svg viewBox="0 0 ${W} ${B + 46}" role="img" aria-label="相対透過性">${g}</svg>`;
+  }
+
+  // ---------- イオン表 ----------
+  function renderIons() {
+    const star = b => b ? "*" : "";
+    $("ions-table").innerHTML = table(["イオン", "名前", "z", "半径 Å", "水和半径 Å", "水和ΔG kJ/mol", `D(${cfg.T_C}℃) 10⁻⁹m²/s`, "理論最大 M", "Bjerrum比", "区分", "備考"],
+      M.ORDER.map(s => {
+        const i = M.ions[s], d = M.derived(cfg, E, s);
+        return [pretty(s), i.name, i.z, fmt(i.r, 3), fmt(i.rHyd, 2) + star(i.rHydEst), Math.round(i.dG) + star(i.dGEst),
+          d.D == null ? "—" : fmt(d.D, 2), fmt(d.cMax, 2), `<span style="color:${d.bjerrum > 1 ? "var(--bad)" : "inherit"}">${fmt(d.bjerrum, 2)}</span>`, i.cat, esc(i.note)];
+      }), 2);
+    $("ions-cmax").innerHTML = cmaxChart();
+    $("ions-davies").innerHTML = daviesChart();
+    dirty.ions = false;
+  }
+  const ZCOL = { 1: "var(--k)", 2: "var(--na)", 3: "var(--ca)" };
+  function cmaxChart() {
+    const data = M.ORDER.map(s => ({ s, z: M.ions[s].z, c: M.derived(cfg, E, s).cMax })).sort((a, b) => a.z - b.z || a.c - b.c);
+    const W = 680, L = 50, Rr = 670, T = 24, B = 210, lo = -1, hi = 1;
+    const y = v => B - (Math.log10(v) - lo) / (hi - lo) * (B - T);
+    const w = (Rr - L) / data.length;
+    let g = "";
+    [0.1, 0.3, 1, 3, 10].forEach(v => {
+      g += `<line x1="${L}" x2="${Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" font-size="11" text-anchor="end" class="mut">${v}</text>`;
+    });
+    data.forEach((d, i) => {
+      const x0 = L + i * w + w * 0.15, top = y(Math.min(10, d.c));
+      g += `<rect x="${x0}" y="${top}" width="${w * 0.7}" height="${B - top}" fill="${ZCOL[d.z]}"/>`;
+      g += `<text transform="translate(${x0 + w * 0.35 + 4},${B + 6}) rotate(-90)" font-size="10.5" text-anchor="end">${pretty(d.s)}</text>`;
+    });
+    g += `<line x1="${L}" x2="${Rr}" y1="${y(0.145)}" y2="${y(0.145)}" stroke="var(--ink)" stroke-dasharray="5 4"/>`;
+    [[1, "1価"], [2, "2価"], [3, "3価"]].forEach(([z, t], k) => {
+      g += `<rect x="${L + 6 + k * 62}" y="5" width="12" height="10" fill="${ZCOL[z]}"/><text x="${L + 22 + k * 62}" y="14" font-size="11.5">${t}</text>`;
+    });
+    g += `<text x="${Rr}" y="14" font-size="11.5" text-anchor="end" class="mut">[M]・対数目盛</text>`;
+    return `<svg viewBox="0 0 ${W} ${B + 44}" role="img" aria-label="理論最大濃度">${g}</svg>`;
+  }
+  function daviesChart() {
+    const W = 680, L = 50, Rr = 670, T = 24, B = 240, xmax = 1;
+    const x = v => L + v / xmax * (Rr - L), y = v => B - v * (B - T);
+    let g = "";
+    for (let v = 0; v <= 1.0001; v += 0.2) {
+      g += `<line x1="${L}" x2="${Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" font-size="11" text-anchor="end" class="mut">${v.toFixed(1)}</text>`;
+      g += `<text x="${x(v)}" y="${B + 16}" font-size="11" text-anchor="middle" class="mut">${v.toFixed(1)}</text>`;
+    }
+    [1, 2, 3].forEach(z => {
+      let p = "";
+      for (let k = 0; k <= 200; k++) { const I = 1e-4 + k / 200 * (xmax - 1e-4); p += (k ? "L" : "M") + x(I).toFixed(1) + "," + y(M.davies(z, I, E.A)).toFixed(1); }
+      g += `<path d="${p}" fill="none" stroke="${ZCOL[z]}" stroke-width="2.5"/>`;
+    });
+    g += `<line x1="${x(Math.min(1, cfg.iMax))}" x2="${x(Math.min(1, cfg.iMax))}" y1="${T}" y2="${B}" stroke="var(--muted)" stroke-dasharray="2 3"/>`;
+    g += `<line x1="${x(native.sum.out.I)}" x2="${x(native.sum.out.I)}" y1="${T}" y2="${B}" stroke="var(--ink)" stroke-dasharray="5 4"/>`;
+    [[1, "|z| = 1"], [2, "|z| = 2"], [3, "|z| = 3"]].forEach(([z, t], k) => {
+      g += `<line x1="${L + 8 + k * 80}" x2="${L + 26 + k * 80}" y1="10" y2="10" stroke="${ZCOL[z]}" stroke-width="3"/><text x="${L + 30 + k * 80}" y="14" font-size="11.5">${t}</text>`;
+    });
+    g += `<text x="${(L + Rr) / 2}" y="${B + 34}" font-size="12" text-anchor="middle" class="mut">イオン強度 I [M]</text>`;
+    return `<svg viewBox="0 0 ${W} ${B + 42}" role="img" aria-label="活量係数">${g}</svg>`;
+  }
+
+  // ---------- 設定 ----------
+  function numInput(path, val, step = "any") {
+    return `<input type="number" inputmode="decimal" step="${step}" data-path="${path}" value="${val}">`;
+  }
+  function renderSettings() {
+    $("set-roles").innerHTML = table(["持ち場", "生体のイオン", "外 mM", "内 mM", "静止時 P", "K_d M"],
+      M.ROLE_KEYS.map(r => {
+        const R = cfg.roles[r];
+        return [M.ROLE_LABEL[r], pretty(R.native), numInput(`roles.${r}.cOut`, R.cOut), numInput(`roles.${r}.cIn`, R.cIn),
+          numInput(`roles.${r}.P`, R.P), numInput(`kdNative.${r}`, cfg.kdNative[r])];
+      }).concat([["Cl⁻（固定）", "Cl⁻", numInput("cl.cOut", cfg.cl.cOut), numInput("cl.cIn", cfg.cl.cIn), numInput("cl.P", cfg.cl.P), "—"]]), 2);
+    $("set-general").innerHTML = `
+      <label>温度 [℃]（水の誘電率・粘度も温度に合わせて変わります）${numInput("T_C", cfg.T_C)}</label>
+      <label>体積分率の上限 φ_max（ランダム最密充填 = 0.64）${numInput("phiMax", cfg.phiMax)}</label>
+      <label>Davies 式の適用上限 [M]${numInput("iMax", cfg.iMax)}</label>
+      <label>浸透圧差の許容範囲 [割合、0.05 = 5%]${numInput("osmTol", cfg.osmTol)}</label>
+      <label>Cl⁻ の水和半径 [Å]${numInput("cl.rHyd", cfg.cl.rHyd)}</label>
+      <label>不透過陰イオンの水和半径 [Å]${numInput("imp.rHyd", cfg.imp.rHyd)}</label>
+      <label>不透過陰イオンの価数
+        <select data-path="imp.z"><option value="-1"${cfg.imp.z === -1 ? " selected" : ""}>−1</option><option value="-2"${cfg.imp.z === -2 ? " selected" : ""}>−2</option></select></label>`;
+    $("set-pmodel").innerHTML = `
+      <label>α（障壁の高さが井戸の深さに連動する割合）${numInput("alpha", cfg.alpha)}</label>
+      <label class="chk" style="flex-direction:row;color:var(--ink)"><input type="checkbox" data-path="useBlock"${cfg.useBlock ? " checked" : ""}> 結合が強すぎるイオンによる詰まり（ブロック）を入れる</label>
+      <label class="chk" style="flex-direction:row;color:var(--ink)"><input type="checkbox" data-path="scaleSiteCharge"${cfg.scaleSiteCharge ? " checked" : ""}> 相似チャネルで、部位の電荷もイオンの価数に比例させる</label>`;
+    if (document.activeElement !== $("set-calib")) $("set-calib").value = JSON.stringify(cfg.calib, null, 2);
+    dirty.settings = false;
+  }
+  function setPath(path, value) {
+    const keys = path.split("."); let o = cfg;
+    keys.slice(0, -1).forEach(k => { o = o[k]; });
+    o[keys[keys.length - 1]] = value;
+  }
+  $("tab-settings").addEventListener("change", e => {
+    const el = e.target; const path = el.dataset && el.dataset.path; if (!path) return;
+    let v;
+    if (el.type === "checkbox") v = el.checked;
+    else { v = parseFloat(el.value); if (!isFinite(v)) { el.value = ""; return; } }
+    if (path === "T_C" && (v < 0 || v > 100)) { alert("温度は 0〜100 ℃ の範囲で入力してください"); renderSettings(); return; }
+    if ((/\.(cIn|cOut)$/.test(path) || /^kdNative/.test(path)) && v <= 0) { alert("濃度と K_d は 0 より大きい値にしてください"); renderSettings(); return; }
+    setPath(path, v); save(); buildRolePickers(); recompute();
+  });
+  $("btn-calib").addEventListener("click", () => {
+    const msg = $("calib-msg");
+    try {
+      const obj = JSON.parse($("set-calib").value);
+      for (const r of M.ROLE_KEYS) {
+        if (!obj[r] || typeof obj[r] !== "object") throw new Error(`"${r}" の項目がありません`);
+        for (const [s, v] of Object.entries(obj[r])) {
+          if (!M.ions[s]) throw new Error(`イオン "${s}" はイオン表にありません`);
+          const ok = (typeof v === "number" && v > 0) || (Array.isArray(v) && v[0] === "<" && typeof v[1] === "number" && v[1] > 0);
+          if (!ok) throw new Error(`${r} の ${s} の値が正しくありません（正の数か ["<", 正の数]）`);
+        }
+      }
+      cfg.calib = obj; save(); recompute();
+      msg.className = "msg ok"; msg.textContent = "較正をやり直しました。";
+    } catch (e) {
+      msg.className = "msg err"; msg.textContent = "エラー: " + e.message;
+    }
+  });
+  $("btn-reset").addEventListener("click", () => {
+    if (!confirm("すべての設定を既定値に戻しますか？")) return;
+    cfg = M.defaults(); save(); applyTheme(); buildRolePickers(); recompute();
+    $("set-calib").value = JSON.stringify(cfg.calib, null, 2);
+  });
+  const syncTheme = seg($("seg-theme"), [["auto", "端末に合わせる"], ["light", "ライト"], ["dark", "ダーク"]], () => cfg.ui.theme, v => { cfg.ui.theme = v; save(); applyTheme(); });
+
+  // ---------- タブ ----------
+  let current = "case";
+  let dirty = { case: true, grid: true, perm: true, ions: true, settings: true };
+  const renderers = { case: renderCase, grid: renderGrid, perm: renderPerm, ions: renderIons, settings: () => { renderSettings(); syncTheme(); } };
+  function renderActive() { if (renderers[current] && dirty[current] !== false) renderers[current](); }
+  function showTab(name) {
+    current = name;
+    document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+    document.querySelectorAll(".tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + name));
+    if (name === "settings") dirty.settings = true;
+    renderActive();
+    window.scrollTo({ top: 0 });
+  }
+  $("tabbar").addEventListener("click", e => { const b = e.target.closest("button"); if (b) showTab(b.dataset.tab); });
+
+  buildRolePickers();
+  recompute();
+
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>
